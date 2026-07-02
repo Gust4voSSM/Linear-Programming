@@ -41,13 +41,11 @@ const elements = {
   addDoctorButton: document.querySelector("#addDoctorButton"),
   loadExampleButton: document.querySelector("#loadExampleButton"),
   clearButton: document.querySelector("#clearButton"),
-  objectivePreview: document.querySelector("#objectivePreview"),
-  constraintsPreview: document.querySelector("#constraintsPreview"),
-  jsonPreview: document.querySelector("#jsonPreview"),
-  copyJsonButton: document.querySelector("#copyJsonButton"),
-  downloadJsonButton: document.querySelector("#downloadJsonButton"),
-  copyStatus: document.querySelector("#copyStatus")
+  startOptimizationButton: document.querySelector("#startOptimizationButton")
 };
+
+const optimizationStorageKey = "simplexOptimizationModel";
+const optimizationNavigationKey = "simplexOpenedFromRegistration";
 
 const state = clone(exampleState);
 
@@ -58,7 +56,17 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function clearStoredOptimization() {
+  try {
+    sessionStorage.removeItem(optimizationStorageKey);
+    sessionStorage.removeItem(optimizationNavigationKey);
+  } catch (error) {
+    // A edição do cadastro não deve depender do armazenamento do navegador.
+  }
+}
+
 function setState(nextState) {
+  clearStoredOptimization();
   state.budget = nextState.budget;
   state.rooms = clone(nextState.rooms);
   state.doctors = clone(nextState.doctors);
@@ -99,6 +107,7 @@ function variableName(index) {
 }
 
 function updateBudget(value) {
+  clearStoredOptimization();
   state.budget = value;
   render();
 }
@@ -108,6 +117,7 @@ function updateRoom(id, field, value) {
   const room = state.rooms.find((item) => Number(item.id) === numericId);
   if (!room) return;
 
+  clearStoredOptimization();
   room[field] = value;
   render();
 }
@@ -117,11 +127,13 @@ function updateDoctor(id, field, value) {
   const doctor = state.doctors.find((item) => Number(item.id) === numericId);
   if (!doctor) return;
 
+  clearStoredOptimization();
   doctor[field] = field === "roomId" ? (value === "" ? null : Number(value)) : value;
   render();
 }
 
 function addRoom() {
+  clearStoredOptimization();
   const id = nextRoomNumber;
   nextRoomNumber += 1;
   state.rooms.push({
@@ -133,6 +145,7 @@ function addRoom() {
 }
 
 function removeRoom(id) {
+  clearStoredOptimization();
   const numericId = Number(id);
   state.rooms = state.rooms.filter((room) => Number(room.id) !== numericId);
   const defaultRoomId = state.rooms[0]?.id ?? null;
@@ -144,6 +157,7 @@ function removeRoom(id) {
 }
 
 function addDoctor() {
+  clearStoredOptimization();
   const id = nextDoctorNumber;
   nextDoctorNumber += 1;
   state.doctors.push({
@@ -158,6 +172,7 @@ function addDoctor() {
 }
 
 function removeDoctor(id) {
+  clearStoredOptimization();
   const numericId = Number(id);
   state.doctors = state.doctors.filter((doctor) => Number(doctor.id) !== numericId);
   render();
@@ -278,8 +293,6 @@ function render() {
   renderBudget(validation);
   renderRooms(validation);
   renderDoctors(validation);
-  renderModelPreview(validation);
-  elements.copyStatus.textContent = "";
   restoreFocus(focusContext);
 }
 
@@ -426,50 +439,6 @@ function renderDoctorNumberInput(doctor, field, errors) {
   `;
 }
 
-function renderModelPreview(validation) {
-  elements.copyJsonButton.disabled = !validation.isValid;
-  elements.downloadJsonButton.disabled = !validation.isValid;
-
-  if (!validation.isValid) {
-    elements.objectivePreview.textContent = "Preencha os campos obrigatórios para montar a função objetivo.";
-    elements.constraintsPreview.textContent = "Preencha os campos obrigatórios para montar as restrições.";
-    elements.jsonPreview.textContent = "JSON indisponível enquanto houver erros de validação.";
-    return;
-  }
-
-  const model = getValidModel();
-  elements.objectivePreview.textContent = buildObjective(model);
-  elements.constraintsPreview.textContent = buildConstraints(model);
-  elements.jsonPreview.textContent = JSON.stringify(model, null, 2);
-}
-
-function buildObjective(model) {
-  const terms = model.doctors.map((doctor, index) => `${formatNumber(doctor.patientsPerHour)}*${variableName(index)}`);
-  return `max Z = ${terms.join(" + ")}`;
-}
-
-function buildConstraints(model) {
-  const lines = [];
-
-  model.doctors.forEach((doctor, index) => {
-    lines.push(`${variableName(index)} <= ${formatNumber(doctor.maxHours)}    (${doctor.name})`);
-  });
-
-  model.rooms.forEach((room) => {
-    const roomTerms = model.doctors
-      .map((doctor, index) => (doctor.roomId === room.id ? variableName(index) : null))
-      .filter(Boolean);
-    const leftSide = roomTerms.length > 0 ? roomTerms.join(" + ") : "0";
-    lines.push(`${leftSide} <= ${formatNumber(room.availableHours)}    (${room.name})`);
-  });
-
-  const budgetTerms = model.doctors.map((doctor, index) => `${formatNumber(doctor.costPerHour)}*${variableName(index)}`);
-  lines.push(`${budgetTerms.join(" + ")} <= ${formatNumber(model.budget)}    (orçamento)`);
-  lines.push(model.doctors.map((_, index) => `${variableName(index)} >= 0`).join(", "));
-
-  return lines.join("\n");
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -519,39 +488,20 @@ function restoreFocus(context) {
   }
 }
 
-async function copyJson() {
+function startOptimization() {
   const validation = validate();
   if (!validation.isValid) {
     showValidationErrors(validation);
     return;
   }
-
-  const json = JSON.stringify(getValidModel(), null, 2);
 
   try {
-    await navigator.clipboard.writeText(json);
-    showToast("JSON copiado.", "success");
+    sessionStorage.setItem(optimizationStorageKey, JSON.stringify(getValidModel()));
+    sessionStorage.setItem(optimizationNavigationKey, "true");
+    window.location.href = "optimization.html";
   } catch (error) {
-    showToast("Não foi possível copiar automaticamente.", "error");
+    showToast("Não foi possível iniciar a otimização.", "error");
   }
-}
-
-function downloadJson() {
-  const validation = validate();
-  if (!validation.isValid) {
-    showValidationErrors(validation);
-    return;
-  }
-
-  const json = JSON.stringify(getValidModel(), null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "simplex-dados.json";
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast("JSON exportado.", "success");
 }
 
 function showToast(message, type = "error") {
@@ -630,7 +580,6 @@ elements.addRoomButton.addEventListener("click", addRoom);
 elements.addDoctorButton.addEventListener("click", addDoctor);
 elements.loadExampleButton.addEventListener("click", () => setState(exampleState));
 elements.clearButton.addEventListener("click", clearState);
-elements.copyJsonButton.addEventListener("click", copyJson);
-elements.downloadJsonButton.addEventListener("click", downloadJson);
+elements.startOptimizationButton.addEventListener("click", startOptimization);
 
 render();

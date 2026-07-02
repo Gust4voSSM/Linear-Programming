@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simplex Didático - Otimização</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </head>
+  <body>
+    <main class="app-shell optimization-page">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Alocação de médicos</p>
+          <h1>Otimização</h1>
+        </div>
+        <div class="header-actions" aria-label="Ações principais">
+          <button class="secondary-button" type="button" id="backButton">Voltar ao cadastro</button>
+        </div>
+      </header>
+
+      <section class="editor-panel optimization-panel" aria-labelledby="tableauTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="tableauTitle">Tableau inicial</h2>
+            <p id="optimizationStatus" aria-live="polite">Gerando tabela do Simplex.</p>
+          </div>
+          <label class="toggle-control" for="showZerosToggle">
+            <input id="showZerosToggle" type="checkbox">
+            <span>Mostrar zeros</span>
+          </label>
+        </div>
+
+        <div class="simplex-summary" aria-label="Resumo da iteração">
+          <div class="summary-item">
+            <span>Iteração</span>
+            <strong id="iterationCounter">0 / 0</strong>
+          </div>
+          <div class="summary-item">
+            <span>Base atual</span>
+            <strong id="baseSummary">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>Valor de Z</span>
+            <strong id="objectiveValue">0</strong>
+          </div>
+          <div class="summary-item">
+            <span>Entra</span>
+            <strong id="enteringVariable">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>Sai</span>
+            <strong id="leavingVariable">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>Pivô</span>
+            <strong id="pivotInfo">-</strong>
+          </div>
+        </div>
+
+        <div class="iteration-controls" aria-label="Navegação entre iterações">
+          <button class="secondary-button icon-button" type="button" id="firstIterationButton" aria-label="Primeiro passo">
+            <i class="fa-solid fa-backward-step" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="previousTableauButton" aria-label="Iteração anterior">
+            <i class="fa-solid fa-backward-fast" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="previousStepButton" aria-label="Subpasso anterior">
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <button class="primary-button icon-button" type="button" id="nextStepButton" aria-label="Próximo subpasso">
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="nextTableauButton" aria-label="Próxima iteração">
+            <i class="fa-solid fa-forward-fast" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="lastIterationButton" aria-label="Último passo">
+            <i class="fa-solid fa-forward-step" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="optimization-layout">
+          <div id="tableauContainer" class="optimization-table-shell"></div>
+
+          <aside class="iteration-panel" aria-label="Iterações e resultado">
+            <section aria-labelledby="iterationsTitle">
+              <h3 id="iterationsTitle">Iterações</h3>
+              <div id="iterationList" class="iteration-list"></div>
+            </section>
+
+            <section class="result-panel" aria-labelledby="resultTitle">
+              <h3 id="resultTitle">Resultado</h3>
+              <div id="resultPanel" class="result-content">Aguardando execução do algoritmo.</div>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="simplex-engine.js"></script>
+    <script src="optimization.js"></script>
+  </body>
+</html>
