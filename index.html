@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simplex Didático - Cadastro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Alocação de médicos</p>
+          <h1>Simplex Didático</h1>
+        </div>
+        <div class="header-actions" aria-label="Ações principais">
+          <button class="secondary-button" type="button" id="loadExampleButton">Carregar exemplo</button>
+          <button class="secondary-button" type="button" id="clearButton">Limpar</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <section class="editor-panel" aria-labelledby="formTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="formTitle">Cadastro dos dados</h2>
+              <p>Informe os recursos do hospital e os dados dos médicos.</p>
+            </div>
+          </div>
+
+          <div class="field-row budget-row">
+            <label for="budget">Orçamento diário</label>
+            <div class="field-control">
+              <input id="budget" name="budget" type="number" min="0" step="0.01" inputmode="decimal">
+              <p class="field-error" id="budgetError"></p>
+            </div>
+          </div>
+
+          <section class="data-section" aria-labelledby="roomsTitle">
+            <div class="section-heading compact">
+              <div>
+                <h3 id="roomsTitle">Consultórios</h3>
+                <p>Cadastre as salas e o total de horas disponíveis.</p>
+              </div>
+              <button class="primary-button" type="button" id="addRoomButton">Adicionar consultório</button>
+            </div>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Horas disponíveis</th>
+                    <th class="action-column">Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="roomsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="data-section" aria-labelledby="doctorsTitle">
+            <div class="section-heading compact">
+              <div>
+                <h3 id="doctorsTitle">Médicos</h3>
+                <p>Defina produtividade, custo, limite de horas e consultório.</p>
+              </div>
+              <button class="primary-button" type="button" id="addDoctorButton">Adicionar médico</button>
+            </div>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Pacientes/h</th>
+                    <th>Custo/h</th>
+                    <th>Máx. horas</th>
+                    <th>Consultório</th>
+                    <th class="action-column">Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="doctorsTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <aside class="preview-panel" aria-labelledby="previewTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="previewTitle">Prévia do modelo</h2>
+              <p>Modelo matemático e JSON para integração futura.</p>
+            </div>
+          </div>
+
+          <section class="model-block" aria-labelledby="objectiveTitle">
+            <h3 id="objectiveTitle">Função objetivo</h3>
+            <pre id="objectivePreview"></pre>
+          </section>
+
+          <section class="model-block" aria-labelledby="constraintsTitle">
+            <h3 id="constraintsTitle">Restrições</h3>
+            <pre id="constraintsPreview"></pre>
+          </section>
+
+          <section class="model-block" aria-labelledby="jsonTitle">
+            <div class="json-heading">
+              <h3 id="jsonTitle">JSON</h3>
+              <div class="json-actions">
+                <button class="secondary-button" type="button" id="downloadJsonButton">Baixar JSON</button>
+                <button class="primary-button" type="button" id="copyJsonButton">Copiar JSON</button>
+              </div>
+            </div>
+            <pre class="json-output" id="jsonPreview"></pre>
+            <p class="copy-status" id="copyStatus" aria-live="polite"></p>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
