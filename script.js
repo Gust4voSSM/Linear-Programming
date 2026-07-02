@@ -301,7 +301,7 @@ function renderRooms(validation) {
       const errors = validation.fieldErrors.rooms[room.id] ?? {};
       return `
         <tr>
-          <td class="field-control" data-label="Nome">
+          <td class="field-control string-field" data-label="Nome">
             <input
               aria-label="Nome do consultório"
               class="${errors.name ? "is-invalid" : ""}"
@@ -358,7 +358,7 @@ function renderDoctors(validation) {
 
       return `
         <tr>
-          <td class="field-control" data-label="Nome">
+          <td class="field-control string-field" data-label="Nome">
             <input
               aria-label="Nome do médico"
               class="${errors.name ? "is-invalid" : ""}"
@@ -378,7 +378,7 @@ function renderDoctors(validation) {
           <td class="field-control" data-label="Máx. horas">
             ${renderDoctorNumberInput(doctor, "maxHours", errors, doctor.id)}
           </td>
-          <td class="field-control" data-label="Consultório">
+          <td class="field-control stacked-field" data-label="Consultório">
             <select
               aria-label="Consultório do médico"
               class="${errors.roomId ? "is-invalid" : ""}"

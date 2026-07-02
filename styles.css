@@ -7,6 +7,8 @@
   --line: #d7e0ea;
   --primary: #126b63;
   --primary-dark: #0d534d;
+  --header-bg: #d9eee9;
+  --header-border: #9fcfc5;
   --danger: #b42318;
   --danger-bg: #fff0ee;
   --warning-bg: #fff7e6;
@@ -207,6 +209,19 @@ select {
   padding: 0 10px;
 }
 
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  padding-right: 10px;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 select {
   appearance: auto;
   line-height: normal;
@@ -358,8 +373,8 @@ select.is-invalid {
 
 
 .table-shell thead th {
-  background: #f8fafc;
-  color: var(--text);
+  background: var(--header-bg);
+  color: var(--primary-dark);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -385,7 +400,7 @@ select.is-invalid {
 
 .table-shell th:nth-child(5),
 .table-shell td:nth-child(5) {
-  min-width: 150px;
+  min-width: 170px;
 }
 
 .table-shell .action-column {
@@ -395,6 +410,10 @@ select.is-invalid {
 
 .table-shell input {
   padding: 0 12px;
+}
+
+.table-shell input[type="number"] {
+  padding-right: 12px;
 }
 
 .table-shell select {
@@ -557,7 +576,7 @@ pre {
 
   .table-shell td {
     display: grid;
-    grid-template-columns: minmax(112px, 38%) minmax(0, 1fr);
+    grid-template-columns: minmax(84px, 29%) minmax(0, 1fr);
     gap: 10px;
     align-items: center;
     border-bottom: 1px solid rgba(215, 224, 234, 0.8);
@@ -574,6 +593,20 @@ pre {
     content: attr(data-label);
     font-size: 0.8rem;
     font-weight: 800;
+  }
+
+  .table-shell td.string-field,
+  .table-shell td.stacked-field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .table-shell td.string-field[data-label="Nome"] {
+    background: var(--header-bg);
+  }
+
+  .table-shell td.string-field[data-label="Nome"]::before {
+    color: var(--primary-dark);
   }
 
   .table-shell td.empty-row {
