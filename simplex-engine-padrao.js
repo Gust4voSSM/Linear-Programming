@@ -1,16 +1,4 @@
-﻿/*
- * Implementação padrão temporária do Simplex.
- *
- * A UI chama createSimplexIterations(context) quando a tela de otimização abre.
- * Troque esta função quando quiser implementar o algoritmo manualmente.
- *
- * Contrato de integração:
- * - não manipule DOM aqui;
- * - retorne um array de iterações ou use context.ui.addIteration(frame);
- * - cada frame representa um tableau renderizável pela UI.
- */
-
-const simplexEpsilon = 1e-9;
+﻿const simplexEpsilon = 1e-9;
 const simplexMaxIterations = 100;
 
 function createSimplexIterations(context) {
@@ -122,7 +110,7 @@ function createSimplexIterations(context) {
       ...context.helpers.cloneFrame(nextFrame),
       title: `Iteração ${step}`,
       iteration: step,
-      substep: "eliminate",
+      substep: "row-op",
       substepLabel: "Eliminar coluna",
       status: "running",
       message: "Coluna pivô eliminada nas demais linhas do tableau.",

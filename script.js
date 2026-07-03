@@ -106,30 +106,36 @@ function variableName(index) {
   return `x_${index + 1}`;
 }
 
-function updateBudget(value) {
+function updateBudget(value, shouldRender = true) {
   clearStoredOptimization();
   state.budget = value;
-  render();
+  if (shouldRender) {
+    render();
+  }
 }
 
-function updateRoom(id, field, value) {
+function updateRoom(id, field, value, shouldRender = true) {
   const numericId = Number(id);
   const room = state.rooms.find((item) => Number(item.id) === numericId);
   if (!room) return;
 
   clearStoredOptimization();
   room[field] = value;
-  render();
+  if (shouldRender) {
+    render();
+  }
 }
 
-function updateDoctor(id, field, value) {
+function updateDoctor(id, field, value, shouldRender = true) {
   const numericId = Number(id);
   const doctor = state.doctors.find((item) => Number(item.id) === numericId);
   if (!doctor) return;
 
   clearStoredOptimization();
   doctor[field] = field === "roomId" ? (value === "" ? null : Number(value)) : value;
-  render();
+  if (shouldRender) {
+    render();
+  }
 }
 
 function addRoom() {
@@ -536,28 +542,28 @@ function showValidationErrors(validation) {
 }
 
 elements.budget.addEventListener("input", (event) => {
-  updateBudget(event.target.value);
+  updateBudget(event.target.value, false);
 });
 
 elements.roomsTable.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
   if (target.dataset.type !== "room") return;
-  updateRoom(target.dataset.id, target.dataset.field, target.value);
+  updateRoom(target.dataset.id, target.dataset.field, target.value, false);
 });
 
 elements.doctorsTable.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
   if (target.dataset.type !== "doctor") return;
-  updateDoctor(target.dataset.id, target.dataset.field, target.value);
+  updateDoctor(target.dataset.id, target.dataset.field, target.value, false);
 });
 
 elements.doctorsTable.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) return;
   if (target.dataset.type !== "doctor") return;
-  updateDoctor(target.dataset.id, target.dataset.field, target.value);
+  updateDoctor(target.dataset.id, target.dataset.field, target.value, true);
 });
 
 document.addEventListener("click", (event) => {

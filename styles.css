@@ -31,7 +31,9 @@ body {
   min-height: 100%;
   background: var(--bg);
   color: var(--text);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  direction: ltr;
 }
 
 button,
@@ -212,10 +214,11 @@ h3 {
 
 .optimization-page {
   width: min(1200px, calc(100% - 32px));
-  height: 100vh;
+  min-height: 100vh;
+  height: auto;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .editor-panel.optimization-panel {
@@ -784,6 +787,8 @@ select {
   color: var(--text);
   line-height: 40px;
   padding: 0 10px;
+  direction: ltr;
+  text-align: left;
 }
 
 input[type="number"] {
