@@ -410,6 +410,35 @@ h3 {
   font-weight: 900;
 }
 
+.simplex-table .entering-base {
+  background: #e8f7ec;
+  color: var(--success);
+  font-weight: 900;
+}
+
+.simplex-table .entering-column {
+  background: #d2f4dd;
+  color: var(--success);
+}
+
+.simplex-table th.entering-column,
+.simplex-table td.entering-column {
+  background: #d2f4dd;
+  color: var(--success);
+}
+
+.simplex-table .entering-column.pivot-column,
+.simplex-table th.entering-column.pivot-column,
+.simplex-table td.entering-column.pivot-column {
+  background: #d2f4dd;
+  color: var(--success);
+}
+
+.simplex-table .pivot-column {
+  background: var(--primary);
+  color: #ffffff;
+}
+
 .simplex-table th:first-child,
 .simplex-table td:first-child {
   position: sticky;

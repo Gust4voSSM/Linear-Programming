@@ -82,17 +82,19 @@ function createSimplexIterations(context) {
     currentFrame.pivot = { rowIndex: leavingRowIndex, columnIndex: enteringColumnIndex };
     currentFrame.substep = "leaving";
     currentFrame.substepLabel = "Variável que sai";
-    const pivotRow = currentFrame.rows[leavingRowIndex];
-    const pivotValue = pivotRow.values[enteringColumnIndex];
-    currentFrame.message = `A variável ${currentFrame.leavingVariable} sai da base. O elemento pivô ${pivotValue} foi identificado.`;
+    
+    const pivotValueMsg = currentFrame.rows[leavingRowIndex].values[enteringColumnIndex];
+    currentFrame.message = `A variável ${currentFrame.leavingVariable} sai da base. O elemento pivô ${pivotValueMsg} foi identificado.`;
     frames.push(helpers.cloneFrame(currentFrame));
 
     currentFrame = helpers.cloneFrame(currentFrame);
+    const activePivotRow = currentFrame.rows[leavingRowIndex];
+    const pivotValue = activePivotRow.values[enteringColumnIndex];
     
-    for (let j = 0; j < pivotRow.values.length; j++) {
-      pivotRow.values[j] /= pivotValue;
+    for (let j = 0; j < activePivotRow.values.length; j++) {
+      activePivotRow.values[j] /= pivotValue;
     }
-    pivotRow.rhs /= pivotValue;
+    activePivotRow.rhs /= pivotValue;
     
     currentFrame.substep = "pivot_row";
     currentFrame.substepLabel = "Normalizar Linha Pivô";
@@ -102,23 +104,23 @@ function createSimplexIterations(context) {
     for (let i = 0; i < currentFrame.rows.length; i++) {
       if (i === leavingRowIndex) continue;
       
-      const targetRow = currentFrame.rows[i];
-      const factor = targetRow.values[enteringColumnIndex];
-      
-      if (Math.abs(factor) == 0) continue;
+      let factor = currentFrame.rows[i].values[enteringColumnIndex];
+      if (factor == 0) continue;
 
       currentFrame = helpers.cloneFrame(currentFrame);
-      const activePivotRow = currentFrame.rows[leavingRowIndex];
+      const currentActivePivot = currentFrame.rows[leavingRowIndex];
       const activeTargetRow = currentFrame.rows[i];
+      
+      factor = activeTargetRow.values[enteringColumnIndex];
 
       for (let j = 0; j < activeTargetRow.values.length; j++) {
-        activeTargetRow.values[j] -= factor * activePivotRow.values[j];
+        activeTargetRow.values[j] -= factor * currentActivePivot.values[j];
       }
-      activeTargetRow.rhs -= factor * activePivotRow.rhs;
+      activeTargetRow.rhs -= factor * currentActivePivot.rhs;
       
       currentFrame.substep = "row_op";
       currentFrame.substepLabel = `Zerar linha ${activeTargetRow.base}`;
-      currentFrame.message = `Subtraindo ${helpers.formatNumber(factor)} × linha ${activePivotRow.base} da linha ${activeTargetRow.base}.`;
+      currentFrame.message = `Subtraindo ${helpers.formatNumber(factor)} × linha ${currentActivePivot.base} da linha ${activeTargetRow.base}.`;
       frames.push(helpers.cloneFrame(currentFrame));
     }
 

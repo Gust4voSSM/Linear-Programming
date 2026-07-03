@@ -259,7 +259,7 @@ function getCellDelta(previousValue, nextValue) {
 }
 
 function buildEliminationDeltas(frame, fallbackFrame) {
-  if (frame.substep !== "eliminate" || !fallbackFrame?.rows) return null;
+  if (frame.substep !== "row_op" || !fallbackFrame?.rows) return null;
 
   return {
     values: frame.rows.map((row, rowIndex) => {
@@ -389,6 +389,10 @@ function getCellClass(frame, rowIndex, columnIndex) {
   const pivot = getPivot(frame);
   const classes = [];
 
+  if (frame.enteringColumnIndex === columnIndex) {
+    classes.push("entering-column");
+  }
+
   if (frame.enteringColumnIndex === columnIndex || pivot?.columnIndex === columnIndex) {
     classes.push("pivot-column");
   }
@@ -432,12 +436,12 @@ function getCellTooltip(frame, rowIndex, columnIndex) {
 }
 
 function getValueDelta(frame, rowIndex, columnIndex) {
-  if (frame.substep !== "eliminate") return 0;
+  if (frame.substep !== "row_op") return 0;
   return Number(frame.operationDeltas?.values?.[rowIndex]?.[columnIndex] ?? 0);
 }
 
 function getSolutionDelta(frame, rowIndex) {
-  if (frame.substep !== "eliminate") return 0;
+  if (frame.substep !== "row_op") return 0;
   return Number(frame.operationDeltas?.rhs?.[rowIndex] ?? 0);
 }
 
@@ -511,8 +515,9 @@ function renderTableau(frame) {
             .map((column, index) => {
               const tooltip = getHeaderTooltip(frame, index);
               const label = getColumnLabel(column);
+              const isEntering = frame.enteringColumnIndex === index;
               const isFocusColumn = frame.enteringColumnIndex === index || pivot?.columnIndex === index;
-              return `<th class="${isFocusColumn ? "pivot-column" : ""} ${tooltip || label ? "has-tooltip" : ""}" data-tableau-column-name="${attr(column)}" ${getTooltipAttributes(tooltip, label)} ${tooltip || label ? `tabindex="0"` : ""}>${formatVariableLabel(column)}</th>`;
+              return `<th class="${[isFocusColumn ? "pivot-column" : "", isEntering ? "entering-column" : ""].filter(Boolean).join(" ")} ${tooltip || label ? "has-tooltip" : ""}" data-tableau-column-name="${attr(column)}" ${getTooltipAttributes(tooltip, label)} ${tooltip || label ? `tabindex="0"` : ""}>${formatVariableLabel(column)}</th>`;
             })
             .join("")}
           <th class="solution-column">Solução</th>
@@ -524,12 +529,13 @@ function renderTableau(frame) {
           .map((row, rowIndex) => {
             const isObjective = row.base === "Z";
             const isLeaving = getLeavingVariable(frame) === row.base;
+            const isEnteringBase = getEnteringVariable(frame) === row.base;
             const baseTooltip = getBaseTooltip(frame, row);
             const baseTooltipAttributes = getTooltipAttributes(baseTooltip, row.label);
             const baseTooltipClass = baseTooltip || row.label ? "has-tooltip" : "";
             return `
               <tr class="${[isObjective ? "objective-row" : "", pivot?.rowIndex === rowIndex ? "pivot-row" : ""].filter(Boolean).join(" ")}" data-tableau-row-index="${rowIndex}" data-tableau-row-base="${attr(row.base)}" data-tableau-row-label="${attr(row.label)}">
-                <td data-label="Base" class="${[isLeaving ? "leaving-base" : "", baseTooltipClass].filter(Boolean).join(" ")}" data-tableau-base-cell="true" ${baseTooltipAttributes} ${baseTooltip || row.label ? `tabindex="0"` : ""}>
+                <td data-label="Base" class="${[isLeaving ? "leaving-base" : "", isEnteringBase ? "entering-base" : "", baseTooltipClass].filter(Boolean).join(" ")}" data-tableau-base-cell="true" ${baseTooltipAttributes} ${baseTooltip || row.label ? `tabindex="0"` : ""}>
                   <strong>${formatVariableLabel(row.base)}</strong>
                 </td>
                 <td data-label="Z" data-tableau-column-name="Z">${renderTableCellValue(isObjective ? 1 : 0)}</td>
