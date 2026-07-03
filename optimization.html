@@ -22,61 +22,35 @@
       <section class="editor-panel optimization-panel" aria-labelledby="tableauTitle">
         <div class="section-heading">
           <div>
-            <h2 id="tableauTitle">Tableau inicial</h2>
             <p id="optimizationStatus" aria-live="polite">Gerando tabela do Simplex.</p>
           </div>
+
+        </div>
+
+        <div class="iteration-controls" aria-label="Navegação entre iterações">
+          <button class="secondary-button icon-button" type="button" id="firstIterationButton" aria-label="Primeiro passo" title="Primeiro passo">
+            <i class="fa-solid fa-backward-step" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="previousTableauButton" aria-label="Iteração anterior" title="Iteração anterior">
+            <i class="fa-solid fa-backward-fast" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="previousStepButton" aria-label="Subpasso anterior" title="Subpasso anterior">
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div class="step-position" id="iterationCounter" aria-live="polite">0.0</div>
+          <button class="secondary-button icon-button" type="button" id="nextStepButton" aria-label="Próximo subpasso" title="Próximo subpasso">
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="nextTableauButton" aria-label="Próxima iteração" title="Próxima iteração">
+            <i class="fa-solid fa-forward-fast" aria-hidden="true"></i>
+          </button>
+          <button class="secondary-button icon-button" type="button" id="lastIterationButton" aria-label="Último passo" title="Último passo">
+            <i class="fa-solid fa-forward-step" aria-hidden="true"></i>
+          </button>
           <label class="toggle-control" for="showZerosToggle">
             <input id="showZerosToggle" type="checkbox">
             <span>Mostrar zeros</span>
           </label>
-        </div>
-
-        <div class="simplex-summary" aria-label="Resumo da iteração">
-          <div class="summary-item">
-            <span>Iteração</span>
-            <strong id="iterationCounter">0 / 0</strong>
-          </div>
-          <div class="summary-item">
-            <span>Base atual</span>
-            <strong id="baseSummary">-</strong>
-          </div>
-          <div class="summary-item">
-            <span>Valor de Z</span>
-            <strong id="objectiveValue">0</strong>
-          </div>
-          <div class="summary-item">
-            <span>Entra</span>
-            <strong id="enteringVariable">-</strong>
-          </div>
-          <div class="summary-item">
-            <span>Sai</span>
-            <strong id="leavingVariable">-</strong>
-          </div>
-          <div class="summary-item">
-            <span>Pivô</span>
-            <strong id="pivotInfo">-</strong>
-          </div>
-        </div>
-
-        <div class="iteration-controls" aria-label="Navegação entre iterações">
-          <button class="secondary-button icon-button" type="button" id="firstIterationButton" aria-label="Primeiro passo">
-            <i class="fa-solid fa-backward-step" aria-hidden="true"></i>
-          </button>
-          <button class="secondary-button icon-button" type="button" id="previousTableauButton" aria-label="Iteração anterior">
-            <i class="fa-solid fa-backward-fast" aria-hidden="true"></i>
-          </button>
-          <button class="secondary-button icon-button" type="button" id="previousStepButton" aria-label="Subpasso anterior">
-            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-          </button>
-          <button class="primary-button icon-button" type="button" id="nextStepButton" aria-label="Próximo subpasso">
-            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-          </button>
-          <button class="secondary-button icon-button" type="button" id="nextTableauButton" aria-label="Próxima iteração">
-            <i class="fa-solid fa-forward-fast" aria-hidden="true"></i>
-          </button>
-          <button class="secondary-button icon-button" type="button" id="lastIterationButton" aria-label="Último passo">
-            <i class="fa-solid fa-forward-step" aria-hidden="true"></i>
-          </button>
         </div>
 
         <div class="optimization-layout">
