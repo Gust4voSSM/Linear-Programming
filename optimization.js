@@ -7,11 +7,6 @@ const elements = {
   status: document.querySelector("#optimizationStatus"),
   tableauContainer: document.querySelector("#tableauContainer"),
   iterationCounter: document.querySelector("#iterationCounter"),
-  baseSummary: document.querySelector("#baseSummary"),
-  objectiveValue: document.querySelector("#objectiveValue"),
-  enteringVariable: document.querySelector("#enteringVariable"),
-  leavingVariable: document.querySelector("#leavingVariable"),
-  pivotInfo: document.querySelector("#pivotInfo"),
   firstIterationButton: document.querySelector("#firstIterationButton"),
   previousTableauButton: document.querySelector("#previousTableauButton"),
   previousStepButton: document.querySelector("#previousStepButton"),
@@ -23,6 +18,9 @@ const elements = {
 };
 
 let currentTableau = null;
+let currentModel = null;
+let activeTooltipTarget = null;
+const tableauDeltaEpsilon = 1e-9;
 
 function formatNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -42,6 +40,11 @@ function formatTableValue(value) {
   return formatNumber(value);
 }
 
+function formatDeltaValue(value) {
+  const sign = value > 0 ? "+" : "-";
+  return `${sign}${formatNumber(Math.abs(value))}`;
+}
+
 function variableName(index) {
   return `x_${index + 1}`;
 }
@@ -59,6 +62,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function attr(value) {
+  return escapeHtml(value).replaceAll("\n", " ");
+}
+
 function formatVariableLabel(value) {
   const match = String(value).match(/^([a-zA-Z])_(\d+)$/);
   if (!match) {
@@ -66,6 +73,13 @@ function formatVariableLabel(value) {
   }
 
   return `${escapeHtml(match[1])}<sub>${escapeHtml(match[2])}</sub>`;
+}
+
+function formatTextWithVariableLabels(value) {
+  return String(value ?? "")
+    .split(/([a-zA-Z]_\d+)/g)
+    .map((part) => (/^[a-zA-Z]_\d+$/.test(part) ? formatVariableLabel(part) : escapeHtml(part)))
+    .join("");
 }
 
 function plainVariableLabel(value) {
@@ -88,6 +102,7 @@ function getTableauColumnWidths(frame) {
     8,
     2
   );
+  const zWidth = columnWidth(1, 4, 6, 2);
 
   const valueWidths = frame.columns.map((column, index) => {
     const maxChars = Math.max(
@@ -96,9 +111,11 @@ function getTableauColumnWidths(frame) {
     );
     return columnWidth(maxChars);
   });
-
   const solutionWidth = columnWidth(
-    Math.max("Solução".length, ...frame.rows.map((row) => formatTableValue(row.rhs).length)),
+    Math.max(
+      "Solução".length,
+      ...frame.rows.map((row) => formatTableValue(row.rhs).length)
+    ),
     10,
     18
   );
@@ -113,7 +130,7 @@ function getTableauColumnWidths(frame) {
     1
   );
 
-  return [baseWidth, ...valueWidths, solutionWidth, intersectionWidth];
+  return [baseWidth, zWidth, ...valueWidths, solutionWidth, intersectionWidth];
 }
 
 function readStoredModel() {
@@ -232,6 +249,31 @@ function cloneFrame(frame) {
   return JSON.parse(JSON.stringify(frame));
 }
 
+function getCellDelta(previousValue, nextValue) {
+  const before = Number(previousValue);
+  const after = Number(nextValue);
+  if (!Number.isFinite(before) || !Number.isFinite(after)) return 0;
+
+  const delta = after - before;
+  return Math.abs(delta) < tableauDeltaEpsilon ? 0 : delta;
+}
+
+function buildEliminationDeltas(frame, fallbackFrame) {
+  if (frame.substep !== "eliminate" || !fallbackFrame?.rows) return null;
+
+  return {
+    values: frame.rows.map((row, rowIndex) => {
+      const previousRow = fallbackFrame.rows[rowIndex];
+      return row.values.map((value, columnIndex) => {
+        return getCellDelta(previousRow?.values?.[columnIndex], value);
+      });
+    }),
+    rhs: frame.rows.map((row, rowIndex) => {
+      return getCellDelta(fallbackFrame.rows[rowIndex]?.rhs, row.rhs);
+    })
+  };
+}
+
 function createInitialFrame(tableau) {
   return {
     iteration: 0,
@@ -252,7 +294,7 @@ function createInitialFrame(tableau) {
 
 function normalizeFrame(frame, index, fallbackFrame) {
   const baseFrame = fallbackFrame ?? {};
-  return {
+  const normalizedFrame = {
     iteration: Number.isFinite(frame.iteration) ? frame.iteration : index,
     title: frame.title || `Iteração ${index}`,
     substep: frame.substep ?? null,
@@ -267,8 +309,14 @@ function normalizeFrame(frame, index, fallbackFrame) {
     leavingRowIndex: frame.leavingRowIndex ?? null,
     leavingVariable: frame.leavingVariable ?? null,
     pivot: frame.pivot ?? null,
-    solution: frame.solution ?? null
+    solution: frame.solution ?? null,
+    operationDeltas: frame.operationDeltas ?? frame.deltas ?? null
   };
+
+  normalizedFrame.operationDeltas =
+    normalizedFrame.operationDeltas ?? buildEliminationDeltas(normalizedFrame, baseFrame);
+
+  return normalizedFrame;
 }
 
 function getEnteringVariable(frame) {
@@ -356,6 +404,96 @@ function getCellClass(frame, rowIndex, columnIndex) {
   return classes.join(" ");
 }
 
+function getHeaderTooltip(frame, columnIndex) {
+  const enteringVariable = getEnteringVariable(frame);
+  if (enteringVariable && frame.columns[columnIndex] === enteringVariable) {
+    return "Variável de entrada";
+  }
+
+  return "";
+}
+
+function getBaseTooltip(frame, row) {
+  const leavingVariable = getLeavingVariable(frame);
+  if (leavingVariable && row.base === leavingVariable) {
+    return "Variável de saída";
+  }
+
+  return "";
+}
+
+function getCellTooltip(frame, rowIndex, columnIndex) {
+  const pivot = getPivot(frame);
+  if (pivot?.rowIndex === rowIndex && pivot?.columnIndex === columnIndex) {
+    return "Pivô";
+  }
+
+  return "";
+}
+
+function getValueDelta(frame, rowIndex, columnIndex) {
+  if (frame.substep !== "eliminate") return 0;
+  return Number(frame.operationDeltas?.values?.[rowIndex]?.[columnIndex] ?? 0);
+}
+
+function getSolutionDelta(frame, rowIndex) {
+  if (frame.substep !== "eliminate") return 0;
+  return Number(frame.operationDeltas?.rhs?.[rowIndex] ?? 0);
+}
+
+function renderDeltaBadge(delta) {
+  if (!Number.isFinite(delta) || Math.abs(delta) < tableauDeltaEpsilon) return "";
+
+  const className = delta > 0 ? "positive" : "negative";
+  return `<span class="cell-delta ${className}">${formatDeltaValue(delta)}</span>`;
+}
+
+function renderTableCellValue(value, delta = 0) {
+  return `
+    <span class="cell-current-value">${formatTableValue(value)}</span>
+    ${renderDeltaBadge(delta)}
+  `;
+}
+
+function getRowLabelKey(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function getColumnLabel(column) {
+  const decisionMatch = String(column).match(/^x_(\d+)$/);
+  if (decisionMatch) {
+    return currentModel?.doctors?.[Number(decisionMatch[1]) - 1]?.name ?? "";
+  }
+
+  const slackMatch = String(column).match(/^s_(\d+)$/);
+  if (!slackMatch || !currentModel) return "";
+
+  const slackIndex = Number(slackMatch[1]) - 1;
+  const doctorCount = currentModel.doctors?.length ?? 0;
+  const roomCount = currentModel.rooms?.length ?? 0;
+
+  if (slackIndex < doctorCount) {
+    return currentModel.doctors[slackIndex]?.name ?? "";
+  }
+
+  if (slackIndex < doctorCount + roomCount) {
+    return currentModel.rooms[slackIndex - doctorCount]?.name ?? "";
+  }
+
+  if (slackIndex === doctorCount + roomCount) {
+    return "Orçamento";
+  }
+
+  return "";
+}
+
+function getTooltipAttributes(primary, secondary) {
+  const attributes = [];
+  if (primary) attributes.push(`data-tooltip="${attr(primary)}"`);
+  if (secondary) attributes.push(`data-tooltip-label="${attr(secondary)}"`);
+  return attributes.join(" ");
+}
+
 function renderTableau(frame) {
   const columnWidths = getTableauColumnWidths(frame);
   const pivot = getPivot(frame);
@@ -368,8 +506,14 @@ function renderTableau(frame) {
       <thead>
         <tr>
           <th>Base</th>
+          <th data-tableau-column-name="Z">Z</th>
           ${frame.columns
-            .map((column, index) => `<th class="${pivot?.columnIndex === index ? "pivot-column" : ""}">${formatVariableLabel(column)}</th>`)
+            .map((column, index) => {
+              const tooltip = getHeaderTooltip(frame, index);
+              const label = getColumnLabel(column);
+              const isFocusColumn = frame.enteringColumnIndex === index || pivot?.columnIndex === index;
+              return `<th class="${isFocusColumn ? "pivot-column" : ""} ${tooltip || label ? "has-tooltip" : ""}" data-tableau-column-name="${attr(column)}" ${getTooltipAttributes(tooltip, label)} ${tooltip || label ? `tabindex="0"` : ""}>${formatVariableLabel(column)}</th>`;
+            })
             .join("")}
           <th class="solution-column">Solução</th>
           <th class="intersection-column">Intersecção</th>
@@ -380,19 +524,25 @@ function renderTableau(frame) {
           .map((row, rowIndex) => {
             const isObjective = row.base === "Z";
             const isLeaving = getLeavingVariable(frame) === row.base;
+            const baseTooltip = getBaseTooltip(frame, row);
+            const baseTooltipAttributes = getTooltipAttributes(baseTooltip, row.label);
+            const baseTooltipClass = baseTooltip || row.label ? "has-tooltip" : "";
             return `
-              <tr class="${[isObjective ? "objective-row" : "", pivot?.rowIndex === rowIndex ? "pivot-row" : ""].filter(Boolean).join(" ")}">
-                <td data-label="Base" class="${isLeaving ? "leaving-base" : ""}">
+              <tr class="${[isObjective ? "objective-row" : "", pivot?.rowIndex === rowIndex ? "pivot-row" : ""].filter(Boolean).join(" ")}" data-tableau-row-index="${rowIndex}" data-tableau-row-base="${attr(row.base)}" data-tableau-row-label="${attr(row.label)}">
+                <td data-label="Base" class="${[isLeaving ? "leaving-base" : "", baseTooltipClass].filter(Boolean).join(" ")}" data-tableau-base-cell="true" ${baseTooltipAttributes} ${baseTooltip || row.label ? `tabindex="0"` : ""}>
                   <strong>${formatVariableLabel(row.base)}</strong>
-                  <span>${escapeHtml(row.label)}</span>
                 </td>
+                <td data-label="Z" data-tableau-column-name="Z">${renderTableCellValue(isObjective ? 1 : 0)}</td>
                 ${row.values
                   .map(
-                    (value, columnIndex) =>
-                      `<td class="${getCellClass(frame, rowIndex, columnIndex)}" data-label="${escapeHtml(frame.columns[columnIndex])}">${formatTableValue(value)}</td>`
+                    (value, columnIndex) => {
+                      const tooltip = getCellTooltip(frame, rowIndex, columnIndex);
+                      const delta = getValueDelta(frame, rowIndex, columnIndex);
+                      return `<td class="${getCellClass(frame, rowIndex, columnIndex)} ${delta ? "has-delta" : ""} ${tooltip ? "has-tooltip" : ""}" data-label="${escapeHtml(frame.columns[columnIndex])}" data-tableau-column-name="${attr(frame.columns[columnIndex])}" ${tooltip ? `data-tooltip="${attr(tooltip)}" tabindex="0"` : ""}>${renderTableCellValue(value, delta)}</td>`;
+                    }
                   )
                   .join("")}
-                <td class="solution-column" data-label="Solução">${formatTableValue(row.rhs)}</td>
+                <td class="solution-column ${getSolutionDelta(frame, rowIndex) ? "has-delta" : ""}" data-label="Solução">${renderTableCellValue(row.rhs, getSolutionDelta(frame, rowIndex))}</td>
                 <td class="intersection-column" data-label="Intersecção">${renderIntersectionValue(frame, row)}</td>
               </tr>
             `;
@@ -404,22 +554,11 @@ function renderTableau(frame) {
 }
 
 function renderSummary(frame, activeIndex, total) {
-  const enteringVariable = getEnteringVariable(frame);
-  const leavingVariable = getLeavingVariable(frame);
-  const pivot = getPivot(frame);
-  const baseValues = frame.rows.filter((row) => row.base !== "Z").map((row) => row.base);
   const substepPosition = getSubstepPosition(simplexUI.frames, activeIndex);
-  const iterationLabel = frame.iteration === 0 ? "Inicial" : `Iteração ${frame.iteration}`;
+  const iterationNumber = frame.iteration ?? 0;
 
-  elements.status.textContent = frame.message || frame.title;
-  elements.iterationCounter.textContent = `${iterationLabel} · ${substepPosition.current}/${substepPosition.total}`;
-  elements.baseSummary.innerHTML = baseValues.length ? baseValues.map(formatVariableLabel).join(", ") : "-";
-  elements.objectiveValue.textContent = formatNumber(frame.objectiveValue);
-  elements.enteringVariable.innerHTML = enteringVariable ? formatVariableLabel(enteringVariable) : "-";
-  elements.leavingVariable.innerHTML = leavingVariable ? formatVariableLabel(leavingVariable) : "-";
-  elements.pivotInfo.innerHTML = pivot
-    ? `${formatVariableLabel(frame.rows[pivot.rowIndex]?.base ?? "-")} × ${formatVariableLabel(frame.columns[pivot.columnIndex] ?? "-")}`
-    : "-";
+  elements.status.innerHTML = formatTextWithVariableLabels(frame.message || frame.title);
+  elements.iterationCounter.textContent = `${iterationNumber}.${substepPosition.current}`;
 }
 
 function renderIterationList(frames, activeIndex) {
@@ -433,7 +572,6 @@ function renderIterationList(frames, activeIndex) {
       <article class="iteration-card ${isActiveIteration ? "is-active" : ""}">
         <button class="iteration-card-title" type="button" data-iteration-index="${indexes[0]}">
           <strong>${escapeHtml(title)}</strong>
-          <span>${escapeHtml(firstFrame.status)}</span>
         </button>
         <div class="substep-list">
           ${indexes
@@ -454,7 +592,298 @@ function renderIterationList(frames, activeIndex) {
   elements.iterationList.innerHTML = groups.join("");
 }
 
+function scrollIterationPanelToActiveSubstep() {
+  const activeSubstep = elements.iterationList.querySelector(".substep-item.is-active");
+  if (!activeSubstep) return;
+
+  activeSubstep.scrollIntoView({
+    block: "nearest",
+    inline: "nearest"
+  });
+}
+
+function getFocusColumnIndex(frame) {
+  if (frame.substep === "intersection") return frame.columns.length + 3;
+
+  const pivot = getPivot(frame);
+  if (pivot && Number.isInteger(pivot.columnIndex)) return pivot.columnIndex + 2;
+  if (Number.isInteger(frame.enteringColumnIndex)) return frame.enteringColumnIndex + 2;
+  return null;
+}
+
+function scrollTableToFrameFocus(frame) {
+  const headerIndex = getFocusColumnIndex(frame);
+  if (headerIndex === null) return;
+
+  const table = elements.tableauContainer.querySelector(".simplex-table");
+  if (!table) return;
+
+  const headerCells = table.querySelectorAll("thead th");
+  const targetHeader = headerCells[headerIndex];
+  const baseHeader = headerCells[0];
+  const solutionHeader = table.querySelector("th.solution-column");
+  if (!targetHeader || !baseHeader || !solutionHeader) return;
+
+  const containerWidth = elements.tableauContainer.clientWidth;
+  const stickyLeftWidth = baseHeader.offsetWidth;
+  const stickyRightWidth = solutionHeader.offsetWidth;
+  const targetLeft = targetHeader.offsetLeft;
+  const targetRight = targetLeft + targetHeader.offsetWidth;
+  const availableWidth = containerWidth - stickyLeftWidth - stickyRightWidth;
+  const targetCenter = targetLeft + (targetRight - targetLeft) / 2;
+  const nextScrollLeft = targetCenter - stickyLeftWidth - availableWidth / 2;
+
+  elements.tableauContainer.scrollTo({
+    left: Math.max(0, nextScrollLeft),
+    behavior: "smooth"
+  });
+}
+
+function scrollResultTargetIntoView(targetCell) {
+  if (!targetCell) return;
+
+  targetCell.scrollIntoView({
+    block: "nearest",
+    inline: "nearest",
+    behavior: "smooth"
+  });
+
+  const table = elements.tableauContainer.querySelector(".simplex-table");
+  const baseHeader = table?.querySelector("thead th:first-child");
+  const solutionHeader = table?.querySelector("th.solution-column");
+  const columnName = targetCell.dataset.tableauColumnName;
+  if (!table || !baseHeader || !solutionHeader || !columnName) return;
+
+  const targetHeader = table.querySelector(`thead th[data-tableau-column-name="${getTableSelectorValue(columnName)}"]`);
+  if (!targetHeader) return;
+
+  const containerWidth = elements.tableauContainer.clientWidth;
+  const stickyLeftWidth = baseHeader.offsetWidth;
+  const stickyRightWidth = solutionHeader.offsetWidth;
+  const targetLeft = targetHeader.offsetLeft;
+  const targetRight = targetLeft + targetHeader.offsetWidth;
+  const availableWidth = containerWidth - stickyLeftWidth - stickyRightWidth;
+  const targetCenter = targetLeft + (targetRight - targetLeft) / 2;
+  const nextScrollLeft = targetCenter - stickyLeftWidth - availableWidth / 2;
+
+  elements.tableauContainer.scrollTo({
+    left: Math.max(0, nextScrollLeft),
+    behavior: "smooth"
+  });
+}
+
+function syncScrollPositions(frame) {
+  requestAnimationFrame(() => {
+    scrollTableToFrameFocus(frame);
+    scrollIterationPanelToActiveSubstep();
+  });
+}
+
+function getTooltipElement() {
+  let tooltip = document.querySelector(".app-tooltip");
+  if (tooltip) return tooltip;
+
+  tooltip = document.createElement("div");
+  tooltip.className = "app-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  document.body.appendChild(tooltip);
+  return tooltip;
+}
+
+function positionTooltip(target, tooltip) {
+  const rect = target.getBoundingClientRect();
+  tooltip.style.left = "0";
+  tooltip.style.top = "0";
+  tooltip.classList.add("is-visible");
+
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const viewportPadding = 10;
+  const top = Math.max(viewportPadding, rect.top - tooltipRect.height - 10);
+  const preferredLeft = rect.left + rect.width / 2 - tooltipRect.width / 2;
+  const left = Math.min(
+    Math.max(viewportPadding, preferredLeft),
+    window.innerWidth - tooltipRect.width - viewportPadding
+  );
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function showTooltip(target) {
+  const text = target.dataset.tooltip;
+  const label = target.dataset.tooltipLabel;
+  if (!text && !label) return;
+
+  activeTooltipTarget = target;
+  const tooltip = getTooltipElement();
+  tooltip.innerHTML = `
+    ${text ? `<div>${escapeHtml(text)}</div>` : ""}
+    ${label ? `<div class="app-tooltip-label">${escapeHtml(label)}</div>` : ""}
+  `;
+  positionTooltip(target, tooltip);
+}
+
+function hideTooltip(target) {
+  if (target && activeTooltipTarget !== target) return;
+
+  activeTooltipTarget = null;
+  const tooltip = document.querySelector(".app-tooltip");
+  if (tooltip) {
+    tooltip.classList.remove("is-visible");
+  }
+}
+
+function refreshTooltipPosition() {
+  if (!activeTooltipTarget) return;
+  positionTooltip(activeTooltipTarget, getTooltipElement());
+}
+
+function getTableSelectorValue(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value).replaceAll('"', '\\"');
+}
+
+function clearResultHighlight() {
+  const table = elements.tableauContainer.querySelector(".simplex-table");
+  if (!table) return;
+
+  table.classList.remove("has-result-highlight");
+  table
+    .querySelectorAll(".is-result-muted, .is-result-highlight, .is-result-context")
+    .forEach((item) => item.classList.remove("is-result-muted", "is-result-highlight", "is-result-context"));
+}
+
+function getResourceSlackName(resourceName) {
+  if (!currentModel) return "";
+
+  const roomIndex = currentModel.rooms?.findIndex((room) => room.name === resourceName) ?? -1;
+  if (roomIndex >= 0) {
+    return slackName((currentModel.doctors?.length ?? 0) + roomIndex);
+  }
+
+  if (getRowLabelKey(resourceName) === getRowLabelKey("Orçamento")) {
+    return slackName((currentModel.doctors?.length ?? 0) + (currentModel.rooms?.length ?? 0));
+  }
+
+  return "";
+}
+
+function getResultHighlightTarget(frame, trigger) {
+  const kind = trigger.dataset.resultKind;
+  if (kind === "objective") {
+    const rowIndex = frame.rows.findIndex((row) => row.base === "Z");
+    return { kind, rowIndex };
+  }
+
+  if (kind === "variable") {
+    const name = trigger.dataset.resultVariable;
+    const rowIndex = frame.rows.findIndex((row) => row.base === name);
+    const columnIndex = frame.columns.findIndex((column) => column === name);
+    return { kind, variableName: name, rowIndex, columnIndex };
+  }
+
+  if (kind === "resource") {
+    const slackVariable = trigger.dataset.resultSlack;
+    const isNonBasicRestriction = slackVariable && !frame.rows.some((row) => row.base === slackVariable);
+    if (isNonBasicRestriction) {
+      return { kind, columnName: slackVariable, isActiveRestriction: true };
+    }
+
+    const labelKey = getRowLabelKey(trigger.dataset.resultResource);
+    const rowIndexByBase = frame.rows.findIndex((row) => row.base === slackVariable);
+    const rowIndex = rowIndexByBase >= 0
+      ? rowIndexByBase
+      : frame.rows.findIndex((row) => getRowLabelKey(row.label) === labelKey);
+    return { kind, rowIndex, columnName: slackVariable };
+  }
+
+  return null;
+}
+
+function applyResultHighlight(trigger) {
+  const frame = simplexUI.getCurrentFrame();
+  const table = elements.tableauContainer.querySelector(".simplex-table");
+  if (!frame || !table) return;
+
+  clearResultHighlight();
+
+  const highlight = getResultHighlightTarget(frame, trigger);
+  if (!highlight) return;
+
+  const rows = [...table.querySelectorAll("tbody tr")];
+  const basicVariables = new Set(frame.rows.map((row) => row.base).filter((base) => base !== "Z"));
+  const targetRow = Number.isInteger(highlight.rowIndex) && highlight.rowIndex >= 0 ? rows[highlight.rowIndex] : null;
+  const targetColumnName = highlight.variableName || highlight.columnName || "";
+  let targetCell = null;
+
+  table.classList.add("has-result-highlight");
+
+  if (targetRow) {
+    rows.forEach((row) => row.classList.add("is-result-muted"));
+    targetRow.classList.remove("is-result-muted");
+    targetRow.classList.add("is-result-context");
+
+    targetRow.querySelectorAll("td[data-tableau-column-name], td.solution-column").forEach((cell) => {
+      const columnName = cell.dataset.tableauColumnName;
+      const isSolutionCell = cell.classList.contains("solution-column");
+      const isObjectiveColumn = columnName === "Z";
+      const isTargetColumn = targetColumnName && columnName === targetColumnName;
+      const isBasicColumn = columnName && basicVariables.has(columnName);
+
+      cell.classList.remove("is-result-muted");
+      cell.classList.add("is-result-context");
+
+      if (!isSolutionCell && !isObjectiveColumn && !isTargetColumn && !isBasicColumn) {
+        cell.classList.add("is-result-muted");
+        cell.classList.remove("is-result-context");
+      }
+
+      if (isSolutionCell) {
+        cell.classList.add("is-result-highlight");
+      }
+    });
+
+    targetCell = targetRow.querySelector(".solution-column");
+  } else if (targetColumnName) {
+    table.querySelectorAll("tbody td[data-tableau-column-name]").forEach((cell) => {
+      const columnName = cell.dataset.tableauColumnName;
+      if (columnName === targetColumnName) {
+        cell.classList.remove("is-result-muted");
+        cell.classList.add("is-result-context");
+      } else {
+        cell.classList.add("is-result-muted");
+      }
+    });
+
+    table.querySelectorAll("thead th[data-tableau-column-name]").forEach((cell) => {
+      if (cell.dataset.tableauColumnName === targetColumnName) {
+        cell.classList.add("is-result-context");
+      }
+    });
+
+    targetCell = table.querySelector(`tbody td[data-tableau-column-name="${getTableSelectorValue(targetColumnName)}"]`);
+    if (typeof showToast === "function") {
+      showToast(`A coluna ${targetColumnName} não está na base.`, "info");
+    }
+  }
+
+  if (targetCell) {
+    scrollResultTargetIntoView(targetCell);
+  }
+}
+
+function bindResultHighlightEvents() {
+  elements.resultPanel.querySelectorAll("[data-result-kind]").forEach((item) => {
+    item.addEventListener("mouseenter", () => applyResultHighlight(item));
+    item.addEventListener("focus", () => applyResultHighlight(item));
+    item.addEventListener("mouseleave", clearResultHighlight);
+    item.addEventListener("blur", clearResultHighlight);
+  });
+}
+
 function renderResult(frame) {
+  clearResultHighlight();
+
   if (frame.status === "unbounded") {
     elements.resultPanel.innerHTML = `<p class="result-badge error">Problema ilimitado.</p>`;
     return;
@@ -472,17 +901,18 @@ function renderResult(frame) {
 
   const variables = frame.solution.variables ?? [];
   const resources = frame.solution.resources ?? [];
+  const basicVariables = new Set(frame.rows.map((row) => row.base).filter((base) => base !== "Z"));
   elements.resultPanel.innerHTML = `
     <p class="result-badge success">Solução ótima encontrada.</p>
     <dl class="result-list">
-      <div>
+      <div class="result-item" data-result-kind="objective" tabindex="0">
         <dt>Valor ótimo</dt>
         <dd>${formatNumber(frame.solution.objectiveValue ?? frame.objectiveValue)}</dd>
       </div>
       ${variables
         .map(
           (variable) => `
-            <div>
+            <div class="result-item" data-result-kind="variable" data-result-variable="${attr(variable.name)}" ${!basicVariables.has(variable.name) ? `data-tooltip="Variável não básica"` : ""} tabindex="0">
               <dt>${formatVariableLabel(variable.name)}${variable.label ? ` · ${escapeHtml(variable.label)}` : ""}</dt>
               <dd>${formatNumber(variable.value)}</dd>
             </div>
@@ -491,16 +921,21 @@ function renderResult(frame) {
         .join("")}
       ${resources
         .map(
-          (resource) => `
-            <div>
+          (resource) => {
+            const resourceSlackName = getResourceSlackName(resource.name);
+            const isNonBasicRestriction = resourceSlackName && !basicVariables.has(resourceSlackName);
+            return `
+            <div class="result-item" data-result-kind="resource" data-result-resource="${attr(resource.name)}" data-result-slack="${attr(resourceSlackName)}" ${isNonBasicRestriction ? `data-tooltip="Restrição ativa" data-tooltip-label="${attr(`${plainVariableLabel(resourceSlackName)} não básica; não aparece na Base`)}"` : ""} tabindex="0">
               <dt>${escapeHtml(resource.name)}</dt>
               <dd>${formatNumber(resource.used)} usados · ${formatNumber(resource.remaining)} restantes</dd>
             </div>
-          `
+          `;
+          }
         )
         .join("")}
     </dl>
   `;
+  bindResultHighlightEvents();
 }
 
 function renderControls(activeIndex, total) {
@@ -600,6 +1035,7 @@ const simplexUI = {
     renderTableau(frame);
     renderIterationList(this.frames, this.activeIndex);
     renderResult(frame);
+    syncScrollPositions(frame);
   }
 };
 
@@ -645,10 +1081,12 @@ function runAlgorithm(model, initialTableau) {
 function init() {
   const model = readStoredModel();
   if (!isValidModel(model)) {
+    currentModel = null;
     renderEmptyState();
     return;
   }
 
+  currentModel = model;
   const initialTableau = buildInitialTableau(model);
   runAlgorithm(model, initialTableau);
 }
@@ -671,6 +1109,40 @@ elements.iterationList.addEventListener("click", (event) => {
   simplexUI.goTo(Number(item.dataset.iterationIndex));
 });
 
+document.addEventListener("pointerover", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const tooltipTarget = target.closest("[data-tooltip], [data-tooltip-label]");
+  if (tooltipTarget instanceof HTMLElement) {
+    showTooltip(tooltipTarget);
+  }
+});
+
+document.addEventListener("pointerout", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const tooltipTarget = target.closest("[data-tooltip], [data-tooltip-label]");
+  if (tooltipTarget instanceof HTMLElement) {
+    hideTooltip(tooltipTarget);
+  }
+});
+
+document.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.dataset.tooltip || target.dataset.tooltipLabel)) {
+    showTooltip(target);
+  }
+});
+
+document.addEventListener("focusout", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.dataset.tooltip || target.dataset.tooltipLabel)) {
+    hideTooltip(target);
+  }
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return;
 
@@ -681,6 +1153,9 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Home") simplexUI.first();
   if (event.key === "End") simplexUI.last();
 });
+
+window.addEventListener("scroll", refreshTooltipPosition, true);
+window.addEventListener("resize", refreshTooltipPosition);
 
 window.simplexUI = simplexUI;
 
